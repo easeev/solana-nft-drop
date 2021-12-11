@@ -1,0 +1,61 @@
+name: Build & deploy
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-20.04
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Install Node.js
+      uses: actions/setup-node@v1
+      with:
+        node-version: 16.x
+
+    - name: Install NPM packages
+      run: npm ci
+    
+    - name: Build project
+      env:
+        REACT_APP_CANDY_MACHINE_CONFIG: ${{ secrets.REACT_APP_CANDY_MACHINE_CONFIG }}
+        REACT_APP_CANDY_MACHINE_ID: ${{ secrets.REACT_APP_CANDY_MACHINE_ID }}
+        REACT_APP_TREASURY_ADDRESS: ${{ secrets.REACT_APP_TREASURY_ADDRESS }}
+        REACT_APP_SOLANA_NETWORK: ${{ secrets.REACT_APP_SOLANA_NETWORK }}
+        REACT_APP_SOLANA_RPC_HOST: ${{ secrets.REACT_APP_SOLANA_RPC_HOST }}
+        CI: false
+      run: npm run build
+
+    - name: Upload production-ready build files
+      uses: actions/upload-artifact@v2
+      with:
+        name: production-files
+        path: ./build
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-20.04
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: production-files
+        path: ./build
+
+    - name: Deploy to gh-pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./build
